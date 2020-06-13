@@ -3,6 +3,7 @@ const express=require("express");
 const bodyParser=require("body-parser");
 const ejs=require("ejs");
 const mongoose=require("mongoose");
+const encrypt=require("mongoose-encryption");
 
 const app=express();
 
@@ -12,13 +13,19 @@ app.use(bodyParser.urlencoded({extended:true}));
 
 mongoose.connect('mongodb://localhost:27017/AuthenticDB', {useNewUrlParser: true, useUnifiedTopology: true});
 
-const userSchema = {
+const userSchema = new mongoose.Schema({
   name:String,
   password:String,
-}
+})
+
+
+const yesecret="Thisismylittlesecret";
+userSchema.plugin(encrypt,{secret:yesecret, excludeFromEncryption: ['name']});
+//so when ever the username is saved it is encrypted first
+//and when we try to find the password it is automatically decrypted
+
 
 const User=new mongoose.model("User",userSchema);
-
 
 app.get("/",function(req,res)
 {
@@ -48,8 +55,8 @@ app.post("/register",function(req,res)
     {
       res.render("secrets");
     }
-  });
   })
+});
 
 app.post("/login",function(req,res)
 {
@@ -71,7 +78,7 @@ else
 }
 })
 
-})
+});
 
 
 
