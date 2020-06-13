@@ -1,4 +1,5 @@
 //jshint esversion:6c
+require('dotenv').config()
 const express=require("express");
 const bodyParser=require("body-parser");
 const ejs=require("ejs");
@@ -19,8 +20,8 @@ const userSchema = new mongoose.Schema({
 })
 
 
-const yesecret="Thisismylittlesecret";
-userSchema.plugin(encrypt,{secret:yesecret, excludeFromEncryption: ['name']});
+
+userSchema.plugin(encrypt,{secret:process.env.YESECRET, excludeFromEncryption: ['name']});
 //so when ever the username is saved it is encrypted first
 //and when we try to find the password it is automatically decrypted
 
@@ -42,6 +43,7 @@ app.get("/register",function(req,res)
   res.render("register");
 });
 
+
 app.post("/register",function(req,res)
 {
   const user=new User(
@@ -58,6 +60,7 @@ app.post("/register",function(req,res)
   })
 });
 
+
 app.post("/login",function(req,res)
 {
   const username=req.body.username;
@@ -72,16 +75,16 @@ else
 {
   if(foundArticle)
   {
+    console.log(foundArticle.password);
     if(foundArticle.password===password)
     res.render("secrets");
+    else
+    console.log("password entered was incorrect");
   }
 }
 })
 
 });
-
-
-
 
 
 app.listen(3000,function(req,res)
