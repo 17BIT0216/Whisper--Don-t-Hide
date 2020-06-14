@@ -10,6 +10,9 @@ const mongoose=require("mongoose");
 const session = require('express-session');
 const passport=require("passport");
 const passportLocalMongoose=require("passport-local-mongoose");
+var GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate=require("mongoose-findorcreate");
+
 
 
 const app=express();
@@ -34,9 +37,11 @@ mongoose.set('useCreateIndex', true);
 const userSchema = new mongoose.Schema({
   name:String,
   password:String,
+  googleId:String,//so it can have a unique google id with which it can be found again
 })
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 //userSchema.plugin(encrypt,{secret:process.env.YESECRET, excludeFromEncryption: ['name']});
 //so when ever the username is saved it is encrypted first
@@ -47,8 +52,33 @@ const User=new mongoose.model("User",userSchema);
 passport.use(User.createStrategy()); //this refers to the strategy we used
 
 // use static serialize and deserialize of model for passport session support
-passport.serializeUser(User.serializeUser()); //serializes and stores the data
-passport.deserializeUser(User.deserializeUser());//deserializes and displays the data
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+  User.findById(id, function(err, user) {
+    done(err, user);
+  });
+});
+
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENTID,
+    clientSecret: process.env.CLIENTSECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    console.log(profile);
+    //here it deals with local storage if it is found in the database then okay other wise it is created
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+
 
 app.get("/",function(req,res)
 {
@@ -74,7 +104,22 @@ app.get("/secrets",function(req,res)
   res.redirect("/login");
 })
 
+//here we serve the get request of the buttons and authenticate using google
+app.get('/auth/google',
+  passport.authenticate("google", { scope: ["profile"] }));
 
+//then google will redirect to this url so we have to serve it
+  app.get('/auth/google/secrets',
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      //if fails then redirected to the login page
+      res.redirect('/secrets');
+    });
+
+
+
+//This works for local
 app.post("/register",function(req,res)
 {
   //here the variable names are fixed has tobe username and password
@@ -82,8 +127,6 @@ User.register({username:req.body.username},req.body.password,function(err,result
 {
   if(err)
   {
-    console.log(result);
-    console.log(err);
   res.redirect("/register");
 }
   else{
@@ -97,7 +140,7 @@ User.register({username:req.body.username},req.body.password,function(err,result
 app.get("/logout",function(req,res)
 {
   req.logout();
-  res.redirect('/register'); 
+  res.redirect('/register');
 })
 
 
