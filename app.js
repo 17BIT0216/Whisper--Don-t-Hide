@@ -38,6 +38,8 @@ const userSchema = new mongoose.Schema({
   name:String,
   password:String,
   googleId:String,//so it can have a unique google id with which it can be found again
+  secrets:String,
+   //store the secret of each indiividual
 })
 
 userSchema.plugin(passportLocalMongoose);
@@ -70,7 +72,6 @@ passport.use(new GoogleStrategy({
 
   },
   function(accessToken, refreshToken, profile, cb) {
-    console.log(profile);
     //here it deals with local storage if it is found in the database then okay other wise it is created
     User.findOrCreate({ googleId: profile.id }, function (err, user) {
       return cb(err, user);
@@ -98,12 +99,29 @@ app.get("/register",function(req,res)
 app.get("/secrets",function(req,res)
 {
   //now here we authenticate our user with his session
-  if(req.isAuthenticated())   //if the request is authentic
-  res.render("secrets");
+  // if(req.isAuthenticated())   //if the request is authentic
+  // res.render("secrets");
+  // else
+  // res.redirect("/login");
+  //Now we are not authenticating the user
+ User.find({"secrets":{$ne:null}}, function(err,usersFound)
+{
+  if(err)
+  console.log(err);
   else
-  res.redirect("/login");
-})
+  {
+    if(usersFound)
+    {
+      console.log(usersFound);
+      res.render("secrets",{userWithSecret:usersFound});
+    }
+  }
+});});
 
+
+
+
+//Google Security
 //here we serve the get request of the buttons and authenticate using google
 app.get('/auth/google',
   passport.authenticate("google", { scope: ["profile"] }));
@@ -116,6 +134,7 @@ app.get('/auth/google',
       //if fails then redirected to the login page
       res.redirect('/secrets');
     });
+
 
 
 
@@ -143,6 +162,14 @@ app.get("/logout",function(req,res)
   res.redirect('/register');
 })
 
+app.get("/submit",function(req,res)
+{
+  if(req.isAuthenticated())   //if the request is authentic
+  res.render("submit");
+})
+
+
+
 
 app.post("/login",function(req,res)
 {
@@ -151,9 +178,7 @@ const newUser= new User(
     name:req.body.username,
     password:req.body.password,
   }
-);
-
-req.login(newUser,function(err)
+);req.login(newUser,function(err)
 {
   if(err)
   {
@@ -166,10 +191,32 @@ req.login(newUser,function(err)
     res.redirect("/secrets");
   });
 }
-
-
 });
 });
+
+
+app.post("/submit",function(req,res)
+{
+  const s=req.user.id;
+  console.log(s);
+  User.findById(s,function(err,result)
+{
+  if(!err)
+  {
+    if(result)
+    {
+      result.secrets=req.body.secret;
+
+      result.save(function()
+      {  res.redirect("/secrets");
+    })
+  }
+  }
+  else
+  console.log("An error Occured 404");
+})
+
+})
 
 
 app.listen(3000,function(req,res)
